@@ -806,44 +806,61 @@
 
             // ==================== 数据加载 ====================
             async function loadAllData() {
-                setSyncStatus('syncing');
-                try {
-                    // 加载目录
-                    const { data: dirs, error: dirsError } = await supabase
-                        .from('directories')
-                        .select('*')
-                        .order('order_index', { ascending: true });
+                async function loadAllData(forceRefresh = false) {
+                    setSyncStatus('syncing');
+                    try {
+                        const { data: dirs, error: dirsError } = await supabase
+                            .from('directories')
+                            .select('*')
+                            .order('order_index', { ascending: true });
 
-                    if (dirsError) throw dirsError;
-                    directories = dirs || [];
+                        if (dirsError) throw dirsError;
+                        
+                        // 更新全局目录缓存（如果请求成功）
+                        directories = dirs || [];
 
-                    // 加载笔记
-                    const dirIds = directories.map(d => d.id);
-                    if (dirIds.length > 0) {
-                        const { data: notes, error: notesError } = await supabase
-                            .from('notes')
-                            .select('dir_id, content')
-                            .in('dir_id', dirIds);
-                        if (notesError) throw notesError;
-                        notesCache = {};
-                        (notes || []).forEach(n => {
-                            notesCache[n.dir_id] = n.content || '';
-                        });
+                        // 加载笔记
+                        const dirIds = directories.map(d => d.id);
+                        if (dirIds.length > 0) {
+                            const { data: notes, error: notesError } = await supabase
+                                .from('notes')
+                                .select('dir_id, content')
+                                .in('dir_id', dirIds);
+                            if (notesError) throw notesError;
+                            
+                            const newNotesCache = {};
+                            (notes || []).forEach(n => {
+                                newNotesCache[n.dir_id] = n.content || '';
+                            });
+                            notesCache = newNotesCache;
+                        } else {
+                            notesCache = {};
+                        }
+
+                        // 加载垃圾箱
+                        const { data: trash, error: trashError } = await supabase
+                            .from('trash')
+                            .select('*')
+                            .order('deleted_at', { ascending: false });
+                        if (trashError) throw trashError;
+                        trashList = trash || [];
+
+                        setSyncStatus('synced');
+                    } catch (e) {
+                        console.warn('数据加载失败，使用本地缓存:', e.message);
+                        setSyncStatus('error');
+                        // 如果之前没有任何数据，且网络错误，给出提示
+                        if (directories.length === 0 && Object.keys(notesCache).length === 0) {
+                            showToast('⚠️ 网络连接失败，请稍后刷新重试');
+                        } else {
+                            showToast('⚠️ 数据刷新失败，显示上次缓存内容');
+                        }
+                        // 不清空 directories / notesCache，保留旧数据继续渲染
                     }
-
-                    // 加载垃圾箱
-                    const { data: trash, error: trashError } = await supabase
-                        .from('trash')
-                        .select('*')
-                        .order('deleted_at', { ascending: false });
-                    if (trashError) throw trashError;
-                    trashList = trash || [];
-
-                    setSyncStatus('synced');
-                } catch (e) {
-                    console.error('数据加载失败:', e);
-                    setSyncStatus('error');
-                    showToast('⚠️ 加载数据失败，请检查网络');
+                    // 无论成功失败，最后都重新渲染一次（如果失败则渲染缓存数据）
+                    renderTree();
+                    updateEditorState();
+                    updateTrashBadge();
                 }
             }
 
