@@ -806,62 +806,71 @@
 
             // ==================== 数据加载 ====================
             async function loadAllData() {
-                async function loadAllData(forceRefresh = false) {
-                    setSyncStatus('syncing');
-                    try {
-                        const { data: dirs, error: dirsError } = await supabase
-                            .from('directories')
-                            .select('*')
-                            .order('order_index', { ascending: true });
+                console.log('🔵 loadAllData 开始执行');
+                setSyncStatus('syncing');
+                try {
+                    const { data: dirs, error: dirsError } = await supabase
+                        .from('directories')
+                        .select('*')
+                        .order('order_index', { ascending: true });
 
-                        if (dirsError) throw dirsError;
-                        
-                        // 更新全局目录缓存（如果请求成功）
-                        directories = dirs || [];
-
-                        // 加载笔记
-                        const dirIds = directories.map(d => d.id);
-                        if (dirIds.length > 0) {
-                            const { data: notes, error: notesError } = await supabase
-                                .from('notes')
-                                .select('dir_id, content')
-                                .in('dir_id', dirIds);
-                            if (notesError) throw notesError;
-                            
-                            const newNotesCache = {};
-                            (notes || []).forEach(n => {
-                                newNotesCache[n.dir_id] = n.content || '';
-                            });
-                            notesCache = newNotesCache;
-                        } else {
-                            notesCache = {};
-                        }
-
-                        // 加载垃圾箱
-                        const { data: trash, error: trashError } = await supabase
-                            .from('trash')
-                            .select('*')
-                            .order('deleted_at', { ascending: false });
-                        if (trashError) throw trashError;
-                        trashList = trash || [];
-
-                        setSyncStatus('synced');
-                    } catch (e) {
-                        console.warn('数据加载失败，使用本地缓存:', e.message);
-                        setSyncStatus('error');
-                        // 如果之前没有任何数据，且网络错误，给出提示
-                        if (directories.length === 0 && Object.keys(notesCache).length === 0) {
-                            showToast('⚠️ 网络连接失败，请稍后刷新重试');
-                        } else {
-                            showToast('⚠️ 数据刷新失败，显示上次缓存内容');
-                        }
-                        // 不清空 directories / notesCache，保留旧数据继续渲染
+                    if (dirsError) {
+                        console.error('❌ 获取目录失败:', dirsError);
+                        throw dirsError;
                     }
-                    // 无论成功失败，最后都重新渲染一次（如果失败则渲染缓存数据）
-                    renderTree();
-                    updateEditorState();
-                    updateTrashBadge();
+                    console.log('✅ 获取目录成功，数量:', dirs?.length, dirs);
+                    
+                    directories = dirs || [];
+
+                    const dirIds = directories.map(d => d.id);
+                    if (dirIds.length > 0) {
+                        const { data: notes, error: notesError } = await supabase
+                            .from('notes')
+                            .select('dir_id, content')
+                            .in('dir_id', dirIds);
+                        if (notesError) {
+                            console.error('❌ 获取笔记失败:', notesError);
+                            throw notesError;
+                        }
+                        console.log('✅ 获取笔记成功，数量:', notes?.length);
+                        const newNotesCache = {};
+                        (notes || []).forEach(n => {
+                            newNotesCache[n.dir_id] = n.content || '';
+                        });
+                        notesCache = newNotesCache;
+                    } else {
+                        console.warn('⚠️ 没有目录ID，笔记缓存清空');
+                        notesCache = {};
+                    }
+
+                    const { data: trash, error: trashError } = await supabase
+                        .from('trash')
+                        .select('*')
+                        .order('deleted_at', { ascending: false });
+                    if (trashError) {
+                        console.error('❌ 获取垃圾箱失败:', trashError);
+                        throw trashError;
+                    }
+                    console.log('✅ 获取垃圾箱成功，数量:', trash?.length);
+                    trashList = trash || [];
+
+                    setSyncStatus('synced');
+                    console.log('🔵 loadAllData 成功完成');
+                } catch (e) {
+                    console.error('❌ loadAllData 异常捕获:', e.message, e);
+                    setSyncStatus('error');
+                    if (directories.length === 0 && Object.keys(notesCache).length === 0) {
+                        console.warn('⚠️ 没有缓存数据，页面将显示为空');
+                    }
+                    // 不清空旧数据
                 }
+                // 暴露调试变量到全局
+                window.debugDirs = directories;
+                window.debugNotes = notesCache;
+                console.log('🔵 即将调用渲染函数...');
+                renderTree();
+                updateEditorState();
+                updateTrashBadge();
             }
 
             function setSyncStatus(status) {
@@ -1160,6 +1169,7 @@
             // ==================== 渲染目录树 ====================
             function renderTree() {
                 const rootDirs = getChildren(null);
+                console.log('🌳 renderTree 被调用，当前 directories:', directories);
                 if (rootDirs.length === 0 && directories.length === 0) {
                     treeView.innerHTML = '';
                     treeEmpty.style.display = 'block';
