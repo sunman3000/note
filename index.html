@@ -4,1174 +4,174 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>云同步·树形目录记事本</title>
-    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root {
-            --bg: #f5f5f0;
-            --panel-bg: #fafaf7;
-            --border: #e0e0d8;
-            --text: #3a3a35;
-            --text-secondary: #7a7a70;
-            --accent: #5b8c5a;
-            --accent-light: #e8f0e6;
-            --star: #d4a017;
-            --danger: #c0392b;
-            --danger-light: #fce8e6;
-            --hover: #f0f0ea;
-            --selected: #e6efe4;
-            --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-            --radius: 8px;
-            --radius-sm: 5px;
-            --transition: 0.18s ease;
-            --divider-width: 5px;
-            --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', 'Monaco', monospace;
-            --font-sans: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: var(--font-sans);
-            background: #e8e6df;
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden;
-            user-select: none;
-            -webkit-user-select: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text);
-        }
-
-        /* 登录遮罩 */
-        .auth-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.45);
-            z-index: 500;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(3px);
-            animation: fadeIn 0.2s ease;
-        }
-        .auth-card {
-            background: #fff;
-            border-radius: 16px;
-            padding: 28px 32px;
-            width: 380px;
-            max-width: 90vw;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
-            text-align: center;
-        }
-        .auth-card h2 {
-            margin-bottom: 6px;
-            font-size: 22px;
-            color: var(--text);
-        }
-        .auth-card p {
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-bottom: 20px;
-        }
-        .auth-card input {
-            width: 100%;
-            padding: 12px 16px;
-            margin: 8px 0;
-            border: 1.5px solid var(--border);
-            border-radius: 8px;
-            font-size: 14px;
-            outline: none;
-            transition: var(--transition);
-            font-family: var(--font-sans);
-        }
-        .auth-card input:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(91, 140, 90, 0.1);
-        }
-        .auth-card button {
-            width: 100%;
-            padding: 12px;
-            margin-top: 12px;
-            border: none;
-            background: var(--accent);
-            color: #fff;
-            font-size: 15px;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: var(--transition);
-            font-family: var(--font-sans);
-        }
-        .auth-card button:hover {
-            background: #4a7a49;
-        }
-        .auth-card .alt-btn {
-            background: transparent;
-            color: var(--accent);
-            border: 1.5px solid var(--accent);
-            font-weight: 500;
-        }
-        .auth-card .alt-btn:hover {
-            background: var(--accent-light);
-        }
-        .auth-card .error-msg {
-            color: var(--danger);
-            font-size: 12px;
-            margin-top: 6px;
-            min-height: 18px;
-        }
-
-        /* 主容器 */
-        .app-container {
-            width: 100%;
-            height: 100%;
-            max-width: 1400px;
-            max-height: 900px;
-            display: flex;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12), 0 2px 10px rgba(0, 0, 0, 0.06);
-            background: var(--bg);
-        }
-
-        @media (max-width: 768px) {
-            .app-container {
-                border-radius: 0;
-                max-width: 100%;
-                max-height: 100%;
-                flex-direction: column;
-            }
-        }
-
-        /* 左侧面板 */
-        .left-panel {
-            width: 320px;
-            min-width: 200px;
-            max-width: 55%;
-            height: 100%;
-            background: var(--panel-bg);
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid var(--border);
-            position: relative;
-            z-index: 2;
-            transition: none;
-        }
-
-        /* 左侧工具栏 */
-        .left-toolbar {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 10px;
-            border-bottom: 1px solid var(--border);
-            background: #fdfdfb;
-            flex-shrink: 0;
-            flex-wrap: wrap;
-            min-height: 52px;
-        }
-        .left-toolbar .search-wrap {
-            display: flex;
-            align-items: center;
-            flex: 1 1 120px;
-            min-width: 80px;
-            position: relative;
-        }
-        .left-toolbar .search-wrap input {
-            width: 100%;
-            height: 32px;
-            border: 1.5px solid var(--border);
-            border-radius: 20px;
-            padding: 0 34px 0 14px;
-            font-size: 13px;
-            background: #fff;
-            color: var(--text);
-            outline: none;
-            transition: var(--transition);
-        }
-        .left-toolbar .search-wrap input:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(91, 140, 90, 0.08);
-        }
-        .left-toolbar .search-wrap .search-clear {
-            position: absolute;
-            right: 8px;
-            cursor: pointer;
-            color: var(--text-secondary);
-            font-size: 13px;
-            padding: 2px 4px;
-            border-radius: 50%;
-            display: none;
-            background: none;
-            border: none;
-            line-height: 1;
-        }
-        .left-toolbar .search-wrap .search-clear.visible {
-            display: block;
-        }
-        .btn-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: var(--radius-sm);
-            border: 1.5px solid transparent;
-            background: transparent;
-            cursor: pointer;
-            font-size: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: var(--transition);
-            color: var(--text-secondary);
-            flex-shrink: 0;
-            position: relative;
-        }
-        .btn-icon:hover {
-            background: var(--hover);
-            border-color: var(--border);
-            color: var(--text);
-        }
-        .btn-icon.danger:hover {
-            background: var(--danger-light);
-            border-color: #e6c0bd;
-            color: var(--danger);
-        }
-        .btn-icon.accent {
-            color: var(--accent);
-            font-weight: bold;
-            font-size: 18px;
-        }
-        .btn-icon.accent:hover {
-            background: var(--accent-light);
-            border-color: #b8d4b6;
-        }
-        .btn-icon.trash-btn .badge {
-            position: absolute;
-            top: -2px;
-            right: -4px;
-            background: var(--danger);
-            color: #fff;
-            font-size: 10px;
-            width: 17px;
-            height: 17px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            pointer-events: none;
-        }
-        .btn-icon.trash-btn .badge:empty {
-            display: none;
-        }
-        .sync-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #ccc;
-            flex-shrink: 0;
-            margin-left: 2px;
-            transition: background 0.3s;
-        }
-        .sync-indicator.synced {
-            background: #5b8c5a;
-        }
-        .sync-indicator.syncing {
-            background: #f0ad4e;
-            animation: pulse 0.8s infinite;
-        }
-        @keyframes pulse {
-            0%,
-            100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.4;
-            }
-        }
-
-        /* 目录区域 */
-        .directory-area {
-            flex: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding: 6px 4px;
-            scroll-behavior: smooth;
-        }
-        .directory-area::-webkit-scrollbar {
-            width: 5px;
-        }
-        .directory-area::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        .directory-area::-webkit-scrollbar-thumb {
-            background: #d0d0c8;
-            border-radius: 10px;
-        }
-
-        /* 垃圾箱视图 */
-        .trash-view {
-            display: none;
-            flex-direction: column;
-            height: 100%;
-        }
-        .trash-view.active {
-            display: flex;
-        }
-        .trash-view .trash-header {
-            padding: 10px 14px;
-            border-bottom: 1px solid var(--border);
-            font-weight: 600;
-            font-size: 14px;
-            color: var(--danger);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: #fefbfb;
-            flex-shrink: 0;
-        }
-        .trash-view .trash-header .back-btn {
-            cursor: pointer;
-            font-size: 13px;
-            color: var(--accent);
-            margin-left: auto;
-            padding: 4px 10px;
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border);
-            background: #fff;
-            transition: var(--transition);
-        }
-        .trash-view .trash-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 8px 6px;
-        }
-        .trash-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 9px 12px;
-            border-radius: var(--radius-sm);
-            margin: 2px 4px;
-            background: #fefefe;
-            border: 1px solid #eee;
-            font-size: 13px;
-        }
-        .trash-item .trash-actions button {
-            font-size: 11px;
-            padding: 4px 10px;
-            border-radius: 4px;
-            border: 1px solid var(--border);
-            background: #fff;
-            cursor: pointer;
-            font-family: var(--font-sans);
-        }
-        .trash-empty {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--text-secondary);
-        }
-
-        /* 目录节点 */
-        .dir-node .dir-row {
-            display: flex;
-            align-items: center;
-            gap: 3px;
-            padding: 7px 8px 7px calc(8px + var(--depth, 0) * 18px);
-            margin: 1px 2px;
-            border-radius: var(--radius-sm);
-            cursor: pointer;
-            transition: var(--transition);
-            border: 2px solid transparent;
-            font-size: 13px;
-            min-height: 34px;
-        }
-        .dir-node .dir-row:hover {
-            background: var(--hover);
-        }
-        .dir-node .dir-row.selected {
-            background: var(--selected);
-            border-color: var(--accent);
-            font-weight: 500;
-        }
-        .dir-node .dir-row.drag-over {
-            background: #e0f0dd;
-            border-color: var(--accent);
-        }
-        .dir-node .dir-row.dragging {
-            opacity: 0.45;
-        }
-        .dir-node .expand-btn {
-            width: 20px;
-            height: 20px;
-            flex-shrink: 0;
-            border-radius: 4px;
-            border: none;
-            background: transparent;
-            cursor: pointer;
-            font-size: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-secondary);
-            padding: 0;
-        }
-        .dir-node .expand-btn.empty {
-            visibility: hidden;
-            pointer-events: none;
-        }
-        .dir-node .expand-btn svg {
-            width: 12px;
-            height: 12px;
-            transition: transform 0.2s ease;
-        }
-        .dir-node.expanded>.dir-row .expand-btn svg {
-            transform: rotate(90deg);
-        }
-        .dir-node .star-btn {
-            flex-shrink: 0;
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
-            border: none;
-            background: transparent;
-            cursor: pointer;
-            font-size: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #ccc;
-            padding: 0;
-            opacity: 0;
-        }
-        .dir-node .dir-row:hover .star-btn {
-            opacity: 1;
-        }
-        .dir-node .star-btn.starred {
-            opacity: 1;
-            color: var(--star);
-        }
-        .dir-node .children {
-            overflow: hidden;
-            transition: max-height 0.25s ease, opacity 0.2s ease;
-            max-height: 0;
-            opacity: 0;
-        }
-        .dir-node.expanded>.children {
-            max-height: 5000px;
-            opacity: 1;
-        }
-        .dir-node.search-hidden {
-            display: none !important;
-        }
-
-        /* 可拖拽分隔条 */
-        .divider {
-            width: var(--divider-width);
-            min-width: var(--divider-width);
-            height: 100%;
-            background: #e8e6df;
-            cursor: col-resize;
-            position: relative;
-            z-index: 3;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .divider::after {
-            content: '';
-            width: 2px;
-            height: 32px;
-            background: #bfbdb5;
-            border-radius: 2px;
-            transition: var(--transition);
-        }
-
-        /* 右侧面板 */
-        .right-panel {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            background: #fffefc;
-            min-width: 260px;
-        }
-
-        .editor-toolbar {
-            display: flex;
-            align-items: center;
-            gap: 3px;
-            padding: 6px 10px;
-            border-bottom: 1px solid var(--border);
-            background: #fdfdfb;
-            flex-shrink: 0;
-            flex-wrap: wrap;
-            min-height: 42px;
-        }
-        .editor-toolbar button,
-        .editor-toolbar select,
-        .editor-toolbar input[type="color"] {
-            height: 30px;
-            border-radius: 5px;
-            border: 1px solid transparent;
-            background: transparent;
-            cursor: pointer;
-            font-size: 13px;
-            color: var(--text-secondary);
-            font-family: var(--font-sans);
-            outline: none;
-        }
-        .editor-toolbar button:hover {
-            background: #f0f0ea;
-            border-color: #ddd;
-        }
-        .note-title-input {
-            flex: 1;
-            min-width: 100px;
-            height: 30px;
-            border: 1px solid transparent;
-            background: transparent;
-            font-size: 15px;
-            font-weight: 600;
-            padding: 0 8px;
-            color: var(--text);
-            outline: none;
-            border-radius: 5px;
-        }
-        .editor-area {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px 24px;
-        }
-        .editor-content {
-            min-height: 300px;
-            outline: none;
-            font-size: 15px;
-            line-height: 1.75;
-            color: var(--text);
-            max-width: 750px;
-            margin: 0 auto;
-        }
-        .no-note-selected {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: #c5c3ba;
-            flex-direction: column;
-        }
-
-        /* 模态框 */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.35);
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            animation: fadeIn 0.15s ease;
-        }
-        .modal-dialog {
-            background: #fff;
-            border-radius: 10px;
-            padding: 20px 24px;
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
-            max-width: 420px;
-            width: 90%;
-            text-align: center;
-        }
-        .toast {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #3a3a35;
-            color: #fff;
-            padding: 10px 22px;
-            border-radius: 20px;
-            font-size: 13px;
-            z-index: 200;
-            animation: toastIn 0.3s ease;
-            pointer-events: none;
-        }
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-            to {
-                opacity: 1;
-            }
-        }
-        @keyframes toastIn {
-            from {
-                opacity: 0;
-                transform: translateX(-50%) translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(-50%) translateY(0);
-            }
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #e8e6df; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .app-container { width: 100%; height: 100%; max-width: 1400px; max-height: 900px; display: flex; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.12); background: #f5f5f0; }
+        .left-panel { width: 320px; min-width: 200px; max-width: 55%; background: #fafaf7; display: flex; flex-direction: column; border-right: 1px solid #e0e0d8; }
+        .left-toolbar { display: flex; gap: 6px; padding: 8px 10px; border-bottom: 1px solid #e0e0d8; align-items: center; flex-wrap: wrap; }
+        .left-toolbar input { height: 32px; border: 1.5px solid #e0e0d8; border-radius: 20px; padding: 0 14px; font-size: 13px; outline: none; flex: 1; min-width: 80px; }
+        .btn-icon { width: 32px; height: 32px; border-radius: 5px; border: 1.5px solid transparent; background: transparent; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; color: #7a7a70; }
+        .btn-icon:hover { background: #f0f0ea; border-color: #e0e0d8; }
+        .directory-area { flex: 1; overflow-y: auto; padding: 6px; }
+        .dir-node .dir-row { display: flex; align-items: center; gap: 3px; padding: 7px 8px 7px calc(8px + var(--depth)*18px); margin: 1px 2px; border-radius: 5px; cursor: pointer; border: 2px solid transparent; font-size: 13px; }
+        .dir-node .dir-row:hover { background: #f0f0ea; }
+        .dir-node .dir-row.selected { background: #e6efe4; border-color: #5b8c5a; }
+        .dir-node .expand-btn { width: 20px; height: 20px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #7a7a70; }
+        .dir-node .star-btn { width: 26px; height: 26px; border: none; background: transparent; cursor: pointer; font-size: 15px; opacity: 0; }
+        .dir-node .dir-row:hover .star-btn { opacity: 1; }
+        .dir-node .star-btn.starred { opacity: 1; color: #d4a017; }
+        .dir-node .children { overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.25s; }
+        .dir-node.expanded > .children { max-height: 5000px; opacity: 1; }
+        .right-panel { flex: 1; display: flex; flex-direction: column; background: #fffefc; }
+        .editor-toolbar { display: flex; gap: 3px; padding: 6px 10px; border-bottom: 1px solid #e0e0d8; align-items: center; flex-wrap: wrap; }
+        .editor-content { flex: 1; padding: 20px; outline: none; font-size: 15px; line-height: 1.75; }
+        .divider { width: 5px; background: #e8e6df; cursor: col-resize; }
+        .auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 500; }
+        .auth-card { background: #fff; padding: 28px 32px; border-radius: 16px; width: 380px; max-width: 90vw; text-align: center; }
+        .auth-card input { width: 100%; padding: 12px; margin: 8px 0; border: 1.5px solid #e0e0d8; border-radius: 8px; font-size: 14px; outline: none; }
+        .auth-card button { width: 100%; padding: 12px; margin-top: 12px; background: #5b8c5a; color: #fff; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #3a3a35; color: #fff; padding: 10px 22px; border-radius: 20px; font-size: 13px; z-index: 200; }
     </style>
 </head>
 <body>
-
-    <!-- 登录界面（未认证时显示） -->
     <div id="authOverlay" class="auth-overlay" style="display:none;">
         <div class="auth-card">
             <h2>📝 云同步记事本</h2>
             <p>使用邮箱登录，跨设备同步数据</p>
             <input type="email" id="authEmail" placeholder="邮箱地址" autocomplete="email">
             <input type="password" id="authPassword" placeholder="密码（至少6位）">
-            <div class="error-msg" id="authError"></div>
+            <div id="authError" style="color:#c0392b;font-size:12px;min-height:18px;"></div>
             <button id="btnLogin">登 录</button>
-            <button id="btnRegister" class="alt-btn">注册新账号</button>
-            <p style="font-size:11px;margin-top:12px;color:#aaa;">数据加密传输，仅您本人可访问</p>
+            <button id="btnRegister" style="background:transparent;color:#5b8c5a;border:1.5px solid #5b8c5a;">注册新账号</button>
         </div>
     </div>
-
-    <!-- 主界面容器 -->
     <div class="app-container" id="appContainer" style="display:none;">
-        <div class="left-panel" id="leftPanel">
+        <div class="left-panel">
             <div class="left-toolbar">
-                <button class="btn-icon accent" id="btnNewDir" title="新建根目录">＋</button>
-                <div class="search-wrap">
-                    <input type="text" id="searchInput" placeholder="搜索目录或笔记..." autocomplete="off">
-                    <button class="search-clear" id="searchClear" title="清除搜索">✕</button>
-                </div>
-                <button class="btn-icon danger" id="btnDelete" title="删除选中目录" disabled>🗑</button>
-                <button class="btn-icon trash-btn" id="btnTrash" title="垃圾箱">
-                    📦<span class="badge" id="trashBadge"></span>
-                </button>
-                <span class="sync-indicator" id="syncIndicator" title="同步状态"></span>
-                <button class="btn-icon" id="btnLogout" title="退出登录" style="font-size:12px;width:auto;padding:0 8px;">🚪</button>
+                <button class="btn-icon" id="btnNewDir" title="新建根目录">＋</button>
+                <input type="text" id="searchInput" placeholder="搜索目录或笔记...">
+                <button class="btn-icon" id="btnDelete" title="删除选中目录" disabled>🗑</button>
+                <button class="btn-icon" id="btnTrash" title="垃圾箱">📦</button>
+                <button class="btn-icon" id="btnLogout" style="font-size:12px;width:auto;padding:0 8px;">🚪</button>
             </div>
             <div class="directory-area" id="directoryArea">
-                <div class="tree-view" id="treeView"></div>
-                <div class="tree-empty" id="treeEmpty">
-                    <span>📂 还没有目录，点击 ＋ 创建</span>
-                </div>
-                <div class="trash-view" id="trashView">
-                    <div class="trash-header">
-                        🗑 垃圾箱
-                        <button class="back-btn" id="btnBackFromTrash">← 返回目录</button>
-                    </div>
-                    <div class="trash-list" id="trashList"></div>
+                <div id="treeView"></div>
+                <div id="treeEmpty" style="text-align:center;padding:40px;color:#7a7a70;">📂 还没有目录，点击 ＋ 创建</div>
+                <div id="trashView" style="display:none;">
+                    <div style="padding:10px;border-bottom:1px solid #e0e0d8;font-weight:bold;">🗑 垃圾箱 <button id="btnBackFromTrash" style="float:right;">返回目录</button></div>
+                    <div id="trashList" style="padding:10px;"></div>
                 </div>
             </div>
         </div>
-
-        <div class="divider" id="divider" title="拖拽调整面板大小"></div>
-
-        <div class="right-panel" id="rightPanel">
-            <div class="editor-toolbar" id="editorToolbar">
-                <input type="text" class="note-title-input" id="noteTitleInput" placeholder="笔记标题" disabled>
-                <button id="btnBold" title="加粗"><b>B</b></button>
-                <button id="btnItalic" title="斜体"><i>I</i></button>
-                <button id="btnUnderline" title="下划线"><u>U</u></button>
-                <button id="btnStrike" title="删除线"><s>S</s></button>
-                <select id="fontSizeSelect" title="字号">
-                    <option value="1">小</option>
-                    <option value="3" selected>中</option>
-                    <option value="5">大</option>
-                </select>
-                <input type="color" id="fontColorInput" value="#3a3a35" title="文字颜色">
-                <button id="btnAlignLeft" title="左对齐">⫷</button>
-                <button id="btnAlignCenter" title="居中">⬌</button>
-                <button id="btnAlignRight" title="右对齐">⫸</button>
-                <button id="btnUL" title="无序列表">•≡</button>
-                <button id="btnOL" title="有序列表">1≡</button>
-                <button id="btnClearFormat" title="清除格式" style="font-size:11px;width:auto;padding:0 6px;">清除</button>
+        <div class="divider" id="divider"></div>
+        <div class="right-panel">
+            <div class="editor-toolbar">
+                <input type="text" id="noteTitleInput" placeholder="笔记标题" disabled style="height:30px;flex:1;border:1px solid transparent;background:transparent;font-weight:bold;padding:0 8px;">
+                <button id="btnBold"><b>B</b></button>
+                <button id="btnItalic"><i>I</i></button>
+                <button id="btnUnderline"><u>U</u></button>
+                <select id="fontSizeSelect"><option value="1">小</option><option value="3" selected>中</option><option value="5">大</option></select>
+                <input type="color" id="fontColorInput" value="#3a3a35">
+                <button id="btnUL">•≡</button>
+                <button id="btnOL">1≡</button>
             </div>
-            <div class="editor-area" id="editorArea">
-                <div class="no-note-selected" id="noNoteSelected">
-                    <span>📝 选择左侧目录开始编辑</span>
-                </div>
-                <div class="editor-content" id="editorContent" contenteditable="true" style="display:none;"></div>
-            </div>
+            <div class="editor-content" id="editorContent" contenteditable="true" style="display:none;"></div>
+            <div id="noNoteSelected" style="display:flex;align-items:center;justify-content:center;height:100%;color:#c5c3ba;">📝 选择左侧目录开始编辑</div>
         </div>
     </div>
-
-    <div id="modalContainer"></div>
     <div id="toastContainer"></div>
-
     <script>
         (function() {
-            // ==================== Supabase 配置 ====================
-            // ！！！ 请替换为您的 Supabase 项目 URL 和 匿名密钥 ！！！
+            // ⚠️ 请替换为你的 Supabase 项目 URL 和 Publishable key
             const SUPABASE_URL = 'https://vrpabvwlmbjrnuonkunj.supabase.co';
             const SUPABASE_ANON_KEY = 'sb_publishable_QFSk4H9MXbh_e9sXBoPGWQ_apyJVtEz';
-
+            
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-            // ==================== 全局状态 ====================
+            
             let currentUser = null;
-            let directories = []; // 本地缓存目录列表
-            let notesCache = {}; // 本地笔记缓存
-            let trashList = []; // 垃圾箱缓存
+            let directories = [];
+            let notesCache = {};
+            let trashList = [];
             let selectedDirId = null;
             let isTrashView = false;
-            let searchQuery = '';
-            let syncTimeout = null;
-            const SYNC_DEBOUNCE = 800; // 笔记自动保存防抖
 
-            // UI元素
-            const authOverlay = document.getElementById('authOverlay');
-            const appContainer = document.getElementById('appContainer');
-            const treeView = document.getElementById('treeView');
-            const treeEmpty = document.getElementById('treeEmpty');
-            const trashViewEl = document.getElementById('trashView');
-            const trashListEl = document.getElementById('trashList');
-            const editorContent = document.getElementById('editorContent');
-            const noNoteSelected = document.getElementById('noNoteSelected');
-            const noteTitleInput = document.getElementById('noteTitleInput');
-            const syncIndicator = document.getElementById('syncIndicator');
-            const trashBadge = document.getElementById('trashBadge');
-
-            // ==================== 认证管理 ====================
+            // 认证
             async function checkSession() {
-                const { data: { session }, error } = await supabase.auth.getSession();
+                const { data: { session } } = await supabase.auth.getSession();
                 if (session?.user) {
                     currentUser = session.user;
-                    authOverlay.style.display = 'none';
-                    appContainer.style.display = 'flex';
+                    document.getElementById('authOverlay').style.display = 'none';
+                    document.getElementById('appContainer').style.display = 'flex';
                     await loadAllData();
-                    renderTree();
-                    updateEditorState();
-                    updateTrashBadge();
                 } else {
                     currentUser = null;
-                    authOverlay.style.display = 'flex';
-                    appContainer.style.display = 'none';
+                    document.getElementById('authOverlay').style.display = 'flex';
+                    document.getElementById('appContainer').style.display = 'none';
                 }
             }
 
-            async function signIn(email, password) {
-                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-                if (error) throw error;
-                currentUser = data.user;
-                authOverlay.style.display = 'none';
-                appContainer.style.display = 'flex';
-                await loadAllData();
-                renderTree();
-                updateEditorState();
-                updateTrashBadge();
-                showToast('✅ 登录成功');
-            }
-
-            async function signUp(email, password) {
-                const { data, error } = await supabase.auth.signUp({ email, password });
-                if (error) throw error;
-                if (data.user) {
-                    currentUser = data.user;
-                    authOverlay.style.display = 'none';
-                    appContainer.style.display = 'flex';
-                    await loadAllData();
-                    renderTree();
-                    updateEditorState();
-                    showToast('🎉 注册成功，开始使用吧');
-                } else {
-                    showToast('📧 请前往邮箱确认注册链接（如有需要）');
-                }
-            }
-
-            async function signOut() {
+            document.getElementById('btnLogin').addEventListener('click', async () => {
+                const email = document.getElementById('authEmail').value.trim();
+                const pwd = document.getElementById('authPassword').value;
+                const { error } = await supabase.auth.signInWithPassword({ email, password: pwd });
+                if (error) return document.getElementById('authError').textContent = '登录失败: ' + error.message;
+                checkSession();
+            });
+            document.getElementById('btnRegister').addEventListener('click', async () => {
+                const email = document.getElementById('authEmail').value.trim();
+                const pwd = document.getElementById('authPassword').value;
+                if (pwd.length < 6) return document.getElementById('authError').textContent = '密码至少6位';
+                const { error } = await supabase.auth.signUp({ email, password: pwd });
+                if (error) return document.getElementById('authError').textContent = '注册失败: ' + error.message;
+                checkSession();
+            });
+            document.getElementById('btnLogout').addEventListener('click', async () => {
                 await supabase.auth.signOut();
-                currentUser = null;
-                directories = [];
-                notesCache = {};
-                trashList = [];
-                selectedDirId = null;
-                isTrashView = false;
-                searchQuery = '';
-                authOverlay.style.display = 'flex';
-                appContainer.style.display = 'none';
-                document.getElementById('searchInput').value = '';
-                updateTrashBadge();
-            }
+                location.reload();
+            });
 
-            // ==================== 数据加载 ====================
+            // 数据加载
             async function loadAllData() {
-                console.log('🔵 loadAllData 开始执行');
-                setSyncStatus('syncing');
                 try {
-                    const { data: dirs, error: dirsError } = await supabase
-                        .from('directories')
-                        .select('*')
-                        .order('order_index', { ascending: true });
-
-                    if (dirsError) {
-                        console.error('❌ 获取目录失败:', dirsError);
-                        throw dirsError;
-                    }
-                    console.log('✅ 获取目录成功，数量:', dirs?.length, dirs);
-                    
+                    const { data: dirs } = await supabase.from('directories').select('*').order('order_index');
                     directories = dirs || [];
-
-                    const dirIds = directories.map(d => d.id);
-                    if (dirIds.length > 0) {
-                        const { data: notes, error: notesError } = await supabase
-                            .from('notes')
-                            .select('dir_id, content')
-                            .in('dir_id', dirIds);
-                        if (notesError) {
-                            console.error('❌ 获取笔记失败:', notesError);
-                            throw notesError;
-                        }
-                        console.log('✅ 获取笔记成功，数量:', notes?.length);
-                        const newNotesCache = {};
-                        (notes || []).forEach(n => {
-                            newNotesCache[n.dir_id] = n.content || '';
-                        });
-                        notesCache = newNotesCache;
-                    } else {
-                        console.warn('⚠️ 没有目录ID，笔记缓存清空');
+                    const ids = directories.map(d => d.id);
+                    if (ids.length) {
+                        const { data: notes } = await supabase.from('notes').select('dir_id,content').in('dir_id', ids);
                         notesCache = {};
-                    }
-
-                    const { data: trash, error: trashError } = await supabase
-                        .from('trash')
-                        .select('*')
-                        .order('deleted_at', { ascending: false });
-                    if (trashError) {
-                        console.error('❌ 获取垃圾箱失败:', trashError);
-                        throw trashError;
-                    }
-                    console.log('✅ 获取垃圾箱成功，数量:', trash?.length);
+                        (notes || []).forEach(n => { notesCache[n.dir_id] = n.content || ''; });
+                    } else notesCache = {};
+                    const { data: trash } = await supabase.from('trash').select('*').order('deleted_at', { ascending: false });
                     trashList = trash || [];
-
-                    setSyncStatus('synced');
-                    console.log('🔵 loadAllData 成功完成');
                 } catch (e) {
-                    console.error('❌ loadAllData 异常捕获:', e.message, e);
-                    setSyncStatus('error');
-                    if (directories.length === 0 && Object.keys(notesCache).length === 0) {
-                        console.warn('⚠️ 没有缓存数据，页面将显示为空');
-                    }
-                    // 不清空旧数据
+                    console.warn('数据加载失败:', e.message);
                 }
-                // 暴露调试变量到全局
-                window.debugDirs = directories;
-                window.debugNotes = notesCache;
-                console.log('🔵 即将调用渲染函数...');
                 renderTree();
                 updateEditorState();
-                updateTrashBadge();
             }
 
-            function setSyncStatus(status) {
-                clearTimeout(syncTimeout);
-                syncIndicator.classList.remove('synced', 'syncing');
-                if (status === 'syncing') syncIndicator.classList.add('syncing');
-                else if (status === 'synced') syncIndicator.classList.add('synced');
-                syncTimeout = setTimeout(() => {
-                    syncIndicator.classList.remove('syncing');
-                    if (syncIndicator.classList.contains('synced')) return;
-                    syncIndicator.classList.add('synced');
-                }, 1500);
-            }
-
-            // ==================== 目录操作（Supabase CRUD） ====================
-            async function insertDir(dir) {
-                setSyncStatus('syncing');
-                const { error } = await supabase.from('directories').insert({
-                    id: dir.id,
-                    user_id: currentUser.id,
-                    name: dir.name,
-                    parent_id: dir.parentId,
-                    is_starred: dir.isStarred,
-                    order_index: dir.order,
-                    created_at: new Date().toISOString()
-                });
-                if (error) throw error;
-                directories.push(dir);
-                setSyncStatus('synced');
-            }
-
-            async function updateDirInDB(dirId, updates) {
-                setSyncStatus('syncing');
-                const { error } = await supabase.from('directories').update(updates).eq('id', dirId);
-                if (error) throw error;
-                const local = directories.find(d => d.id === dirId);
-                if (local) Object.assign(local, updates);
-                setSyncStatus('synced');
-            }
-
-            async function deleteDirsFromDB(dirIds) {
-                setSyncStatus('syncing');
-                const { error } = await supabase.from('directories').delete().in('id', dirIds);
-                if (error) throw error;
-                directories = directories.filter(d => !dirIds.includes(d.id));
-                setSyncStatus('synced');
-            }
-
-            async function saveNoteToDB(dirId, content) {
-                setSyncStatus('syncing');
-                const { error } = await supabase.from('notes').upsert({
-                    dir_id: dirId,
-                    content: content
-                }, { onConflict: 'dir_id' });
-                if (error) throw error;
-                notesCache[dirId] = content;
-                setSyncStatus('synced');
-            }
-
-            async function insertTrashItem(item) {
-                setSyncStatus('syncing');
-                const { error } = await supabase.from('trash').insert({
-                    user_id: currentUser.id,
-                    dir_data: item.dirData,
-                    sub_tree: item.subTree || [],
-                    notes_data: item.notesData || {},
-                    deleted_at: new Date().toISOString()
-                });
-                if (error) throw error;
-                trashList.unshift(item);
-                setSyncStatus('synced');
-            }
-
-            async function deleteTrashFromDB(trashId) {
-                setSyncStatus('syncing');
-                const { error } = await supabase.from('trash').delete().eq('id', trashId);
-                if (error) throw error;
-                trashList = trashList.filter(t => t.id !== trashId);
-                setSyncStatus('synced');
-            }
-
-            // ==================== 业务逻辑（大部分保留原逻辑，仅替换数据源） ====================
+            // 帮助函数
             function getChildren(parentId) {
-                let children = directories.filter(d => d.parentId === parentId);
-                children.sort((a, b) => {
-                    if (a.isStarred !== b.isStarred) return b.isStarred - a.isStarred;
-                    return a.order - b.order;
-                });
-                return children;
+                return directories.filter(d => d.parentId === parentId).sort((a,b) => (b.isStarred - a.isStarred) || (a.order - b.order));
             }
-
             function getDescendantIds(dirId) {
                 const result = [];
                 const stack = [dirId];
                 while (stack.length) {
                     const cur = stack.pop();
-                    getChildren(cur).forEach(c => {
-                        result.push(c.id);
-                        stack.push(c.id);
-                    });
+                    getChildren(cur).forEach(c => { result.push(c.id); stack.push(c.id); });
                 }
                 return result;
             }
+            function generateId() { return 'd_' + Date.now() + '_' + Math.random().toString(36).substr(2,6); }
 
-            function isDescendantOf(dirId, ancestorId) {
-                let cur = directories.find(d => d.id === dirId);
-                while (cur && cur.parentId) {
-                    if (cur.parentId === ancestorId) return true;
-                    cur = directories.find(d => d.id === cur.parentId);
-                }
-                return false;
-            }
-
-            function generateId() {
-                return 'd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-            }
-
-            // 创建目录
-            async function createNewDirectory(parentId = null) {
-                const name = prompt('请输入目录名称：', '新建目录');
-                if (!name || !name.trim()) return;
-                const siblings = getChildren(parentId);
-                const newDir = {
-                    id: generateId(),
-                    name: name.trim(),
-                    parentId: parentId,
-                    isStarred: false,
-                    order: siblings.length,
-                };
-                try {
-                    await insertDir(newDir);
-                    renderTree();
-                    selectDirectory(newDir.id);
-                    showToast('✅ 目录已创建');
-                } catch (e) {
-                    showToast('❌ 创建失败');
-                }
-            }
-
-            // 选择目录
-            function selectDirectory(dirId) {
-                saveCurrentNote();
-                selectedDirId = dirId;
-                updateDeleteButton();
-                updateEditorState();
-                renderTree();
-                setTimeout(() => {
-                    const row = document.querySelector(`.dir-node[data-dir-id="${dirId}"] .dir-row`);
-                    if (row) row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }, 50);
-            }
-
-            // 星标切换
-            async function toggleStar(dirId) {
-                const dir = directories.find(d => d.id === dirId);
-                if (!dir) return;
-                const newStar = !dir.isStarred;
-                await updateDirInDB(dirId, { is_starred: newStar });
-                renderTree();
-            }
-
-            // 移动到垃圾箱
-            async function deleteToTrash(dirId) {
-                const dir = directories.find(d => d.id === dirId);
-                if (!dir) return;
-                const descendantIds = getDescendantIds(dirId);
-                const allIds = [dirId, ...descendantIds];
-                const subTree = directories.filter(d => allIds.includes(d.id) && d.id !== dirId);
-                const notesData = {};
-                allIds.forEach(id => { if (notesCache[id] !== undefined) notesData[id] = notesCache[id]; });
-
-                const trashItem = {
-                    dirData: { ...dir },
-                    subTree: subTree,
-                    notesData: notesData,
-                };
-
-                // 删除目录和笔记
-                await deleteDirsFromDB(allIds);
-                // 清理笔记缓存
-                allIds.forEach(id => delete notesCache[id]);
-                // 插入垃圾箱
-                await insertTrashItem(trashItem);
-
-                if (selectedDirId && allIds.includes(selectedDirId)) selectedDirId = null;
-                renderTree();
-                updateEditorState();
-                updateTrashBadge();
-                showToast('🗑 已移至垃圾箱');
-            }
-
-            function confirmDelete(dirId) {
-                const dir = directories.find(d => d.id === dirId);
-                if (!dir) return;
-                const count = getDescendantIds(dirId).length;
-                let msg = `确定删除"${dir.name}"？`;
-                if (count > 0) msg += ` (含${count}个子目录)`;
-                showModal('确认删除', msg, () => deleteToTrash(dirId));
-            }
-
-            // 垃圾箱操作
-            async function restoreFromTrash(index) {
-                const item = trashList[index];
-                if (!item) return;
-                const dir = item.dir_data;
-                // 检查原始父目录是否存在
-                let targetParent = dir.parent_id || dir.parentId || null;
-                if (targetParent && !directories.find(d => d.id === targetParent)) targetParent = null;
-
-                const newDir = {
-                    id: dir.id,
-                    name: dir.name,
-                    parentId: targetParent,
-                    isStarred: dir.is_starred || false,
-                    order: getChildren(targetParent).length,
-                };
-                await insertDir(newDir);
-                // 恢复子树
-                if (item.sub_tree) {
-                    for (const sub of item.sub_tree) {
-                        const subDir = { ...sub, parentId: sub.parent_id || sub.parentId || targetParent };
-                        await insertDir(subDir);
-                    }
-                }
-                // 恢复笔记
-                if (item.notes_data) {
-                    for (const [nid, content] of Object.entries(item.notes_data)) {
-                        await saveNoteToDB(nid, content);
-                    }
-                }
-                await deleteTrashFromDB(item.id);
-                await loadAllData();
-                renderTree();
-                hideTrashView();
-                updateTrashBadge();
-                showToast('✅ 已恢复');
-            }
-
-            async function permanentlyDelete(index) {
-                const item = trashList[index];
-                if (!item) return;
-                showModal('永久删除', '此操作不可恢复，确定吗？', async () => {
-                    await deleteTrashFromDB(item.id);
-                    updateTrashBadge();
-                    renderTrashList();
-                    showToast('🗑 已永久删除');
-                });
-            }
-
-            function showTrashView() {
-                isTrashView = true;
-                saveCurrentNote();
-                selectedDirId = null;
-                treeView.style.display = 'none';
-                treeEmpty.style.display = 'none';
-                trashViewEl.classList.add('active');
-                updateDeleteButton();
-                updateEditorState();
-                renderTrashList();
-            }
-
-            function hideTrashView() {
-                isTrashView = false;
-                treeView.style.display = 'block';
-                trashViewEl.classList.remove('active');
-                updateDeleteButton();
-                updateEditorState();
-                renderTree();
-            }
-
-            function renderTrashList() {
-                if (trashList.length === 0) {
-                    trashListEl.innerHTML = '<div class="trash-empty">🧹 垃圾箱是空的</div>';
-                } else {
-                    trashListEl.innerHTML = trashList.map((item, idx) => {
-                        const name = item.dir_data?.name || '未知';
-                        const date = new Date(item.deleted_at).toLocaleString();
-                        const subCount = (item.sub_tree || []).length;
-                        return `<div class="trash-item">
-                <span>📁 ${escapeHtml(name)}${subCount>0?` (含${subCount}子目录)` : ''}</span>
-                <span style="font-size:11px;color:#888;margin-left:auto;">${date}</span>
-                <span class="trash-actions">
-                  <button onclick="window._restoreTrash(${idx})">恢复</button>
-                  <button onclick="window._permDeleteTrash(${idx})" style="color:#c0392b;">永久删除</button>
-                </span></div>`;
-                    }).join('');
-                }
-            }
-            window._restoreTrash = restoreFromTrash;
-            window._permDeleteTrash = permanentlyDelete;
-
-            function updateTrashBadge() {
-                trashBadge.textContent = trashList.length > 0 ? trashList.length : '';
-            }
-
-            // ==================== 渲染目录树 ====================
+            // 渲染
             function renderTree() {
-                console.log('🌳 renderTree 被调用，当前 directories:', directories);
                 const rootDirs = getChildren(null);
-                console.log('🌳 根目录数量:', rootDirs.length, '根目录列表:', rootDirs);   // 新增
-                console.log('🌳 treeView当前display:', document.getElementById('treeView').style.display); // 新增
+                const treeView = document.getElementById('treeView');
+                const treeEmpty = document.getElementById('treeEmpty');
                 if (rootDirs.length === 0 && directories.length === 0) {
                     treeView.innerHTML = '';
                     treeEmpty.style.display = 'block';
@@ -1180,8 +180,7 @@
                     treeView.innerHTML = '';
                     rootDirs.forEach(dir => treeView.appendChild(createDirNodeElement(dir, 0)));
                 }
-                updateDeleteButton();
-                updateEditorState();
+                document.getElementById('btnDelete').disabled = !selectedDirId || isTrashView;
             }
 
             function createDirNodeElement(dir, depth) {
@@ -1189,359 +188,165 @@
                 node.className = 'dir-node expanded';
                 node.dataset.dirId = dir.id;
                 node.style.setProperty('--depth', depth);
-                const children = getChildren(dir.id);
-                const hasChildren = children.length > 0;
-
                 const row = document.createElement('div');
                 row.className = 'dir-row';
-                row.draggable = true;
                 if (dir.id === selectedDirId) row.classList.add('selected');
-
                 const expandBtn = document.createElement('button');
-                expandBtn.className = 'expand-btn' + (hasChildren ? '' : ' empty');
-                expandBtn.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.5" fill="none"/></svg>`;
-                expandBtn.addEventListener('click', e => { e.stopPropagation();
-                    node.classList.toggle('expanded'); });
+                expandBtn.className = 'expand-btn' + (getChildren(dir.id).length ? '' : ' empty');
+                expandBtn.innerHTML = '▶';
+                expandBtn.addEventListener('click', e => { e.stopPropagation(); node.classList.toggle('expanded'); });
                 row.appendChild(expandBtn);
-
                 const icon = document.createElement('span');
-                icon.className = 'dir-icon';
-                const hasNote = notesCache[dir.id] && notesCache[dir.id].trim().length > 0;
-                icon.textContent = hasChildren ? (hasNote ? '📒' : '📁') : (hasNote ? '📄' : '📃');
+                icon.textContent = '📄';
                 row.appendChild(icon);
-
-                const nameSpan = document.createElement('span');
-                nameSpan.className = 'dir-name';
-                nameSpan.textContent = dir.name;
-                if (searchQuery) {
-                    const regex = new RegExp(`(${escapeRegex(searchQuery)})`, 'gi');
-                    nameSpan.innerHTML = dir.name.replace(regex, '<span style="background:#ffe08a;border-radius:2px;">$1</span>');
-                }
-                row.appendChild(nameSpan);
-
+                const name = document.createElement('span');
+                name.textContent = dir.name;
+                row.appendChild(name);
                 const starBtn = document.createElement('button');
                 starBtn.className = 'star-btn' + (dir.isStarred ? ' starred' : '');
                 starBtn.textContent = dir.isStarred ? '⭐' : '☆';
-                starBtn.addEventListener('click', e => { e.stopPropagation();
-                    toggleStar(dir.id); });
+                starBtn.addEventListener('click', e => { e.stopPropagation(); toggleStar(dir.id); });
                 row.appendChild(starBtn);
-
                 row.addEventListener('click', () => selectDirectory(dir.id));
-                row.addEventListener('contextmenu', e => { e.preventDefault();
-                    showContextMenu(e.clientX, e.clientY, dir.id); });
-
-                // 拖拽事件（保留原逻辑）
-                row.addEventListener('dragstart', e => handleDragStart(e, dir.id));
-                row.addEventListener('dragover', e => handleDragOver(e, dir.id));
-                row.addEventListener('dragleave', e => handleDragLeave(e, dir.id));
-                row.addEventListener('drop', e => handleDrop(e, dir.id));
-                row.addEventListener('dragend', handleDragEnd);
-
                 node.appendChild(row);
                 const childrenContainer = document.createElement('div');
                 childrenContainer.className = 'children';
-                children.forEach(c => childrenContainer.appendChild(createDirNodeElement(c, depth + 1)));
+                getChildren(dir.id).forEach(c => childrenContainer.appendChild(createDirNodeElement(c, depth+1)));
                 node.appendChild(childrenContainer);
-
-                if (searchQuery) applySearchFilter(node, dir);
                 return node;
             }
 
-            function applySearchFilter(node, dir) {
-                const nameMatch = dir.name.toLowerCase().includes(searchQuery.toLowerCase());
-                const noteMatch = (notesCache[dir.id] || '').toLowerCase().includes(searchQuery.toLowerCase());
-                const descMatch = getDescendantIds(dir.id).some(did => {
-                    const d = directories.find(dd => dd.id === did);
-                    return d && (d.name.toLowerCase().includes(searchQuery.toLowerCase()) || (notesCache[did] || '')
-                        .toLowerCase().includes(searchQuery.toLowerCase()));
-                });
-                if (!nameMatch && !noteMatch && !descMatch) node.classList.add('search-hidden');
-                else {
-                    node.classList.remove('search-hidden');
-                    node.classList.add('expanded');
-                }
-            }
-
-            function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
-
-            // 拖拽移动
-            let draggedDirId = null;
-            async function handleDrop(e, targetId) {
-                e.preventDefault();
-                document.querySelectorAll('.dir-row.drag-over').forEach(r => r.classList.remove('drag-over'));
-                if (!draggedDirId || draggedDirId === targetId) return;
-                if (isDescendantOf(targetId, draggedDirId)) { showToast('⚠️ 不能移动到子目录');
-                    return; }
-                const dir = directories.find(d => d.id === draggedDirId);
-                if (!dir) return;
-                const oldParent = dir.parentId;
-                dir.parentId = targetId;
-                const siblings = getChildren(targetId);
-                dir.order = siblings.length;
-                await updateDirInDB(draggedDirId, { parent_id: targetId, order_index: dir.order });
-                // 调整原兄弟排序（可选）
-                if (oldParent !== targetId) {
-                    const oldSiblings = getChildren(oldParent);
-                    for (let i = 0; i < oldSiblings.length; i++) {
-                        await updateDirInDB(oldSiblings[i].id, { order_index: i });
-                    }
-                }
-                await loadAllData();
+            function selectDirectory(dirId) {
+                saveCurrentNote();
+                selectedDirId = dirId;
                 renderTree();
-                showToast('📂 已移动');
-            }
-
-            function handleDragStart(e, id) { draggedDirId = id;
-                e.currentTarget.classList.add('dragging'); }
-
-            function handleDragOver(e, id) { e.preventDefault(); if (draggedDirId && draggedDirId !== id && !isDescendantOf(
-                    id, draggedDirId)) e.currentTarget.classList.add('drag-over'); }
-
-            function handleDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
-
-            function handleDragEnd() { document.querySelectorAll('.dir-row.dragging').forEach(r => r.classList.remove(
-                    'dragging'));
-                draggedDirId = null; }
-
-            // 右键菜单
-            function showContextMenu(x, y, dirId) {
-                const old = document.getElementById('contextMenu');
-                if (old) old.remove();
-                const menu = document.createElement('div');
-                menu.id = 'contextMenu';
-                menu.style.cssText =
-                    `position:fixed;left:${x}px;top:${y}px;background:#fff;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,0.18);z-index:150;min-width:160px;padding:4px 0;font-size:13px;`;
-                [
-                    { label: '📂 新建子目录', action: () => createNewDirectory(dirId) },
-                    { label: (directories.find(d => d.id === dirId)?.isStarred ? '⭐ 取消星标' : '☆ 设为星标'),
-                        action: () => toggleStar(dirId) },
-                    { label: '📌 移至根目录', action: async () => { const dir = directories.find(d => d.id ===
-                                dirId); if (dir) { dir.parentId = null;
-                                dir.order = getChildren(null).length; await updateDirInDB(dirId, {
-                                    parent_id: null,
-                                    order_index: dir.order });
-                                await loadAllData();
-                                renderTree();
-                                showToast('📌 已移至根目录'); } } },
-                    { label: '🗑 删除', action: () => confirmDelete(dirId), danger: true },
-                ].forEach(item => {
-                    const mi = document.createElement('div');
-                    mi.textContent = item.label;
-                    mi.style.cssText =
-                        `padding:8px 16px;cursor:pointer;color:${item.danger?'var(--danger)':'var(--text)'};`;
-                    mi.onmouseenter = () => mi.style.background = item.danger ? 'var(--danger-light)' :
-                        'var(--hover)';
-                    mi.onmouseleave = () => mi.style.background = 'transparent';
-                    mi.onclick = () => { menu.remove();
-                        item.action(); };
-                    menu.appendChild(mi);
-                });
-                document.body.appendChild(menu);
-                const close = e => { if (!menu.contains(e.target)) { menu.remove();
-                        document.removeEventListener('click', close); } };
-                setTimeout(() => document.addEventListener('click', close), 10);
-            }
-
-            // 编辑器
-            function updateDeleteButton() {
-                const btn = document.getElementById('btnDelete');
-                btn.disabled = !selectedDirId || isTrashView;
+                updateEditorState();
             }
 
             function updateEditorState() {
-                if (selectedDirId && !isTrashView) {
-                    editorContent.style.display = 'block';
-                    noNoteSelected.style.display = 'none';
-                    editorContent.innerHTML = notesCache[selectedDirId] || '';
-                    const dir = directories.find(d => d.id === selectedDirId);
-                    noteTitleInput.value = dir ? dir.name : '';
-                    noteTitleInput.disabled = false;
-                    document.getElementById('editorToolbar').style.opacity = '1';
-                    document.getElementById('editorToolbar').style.pointerEvents = 'auto';
+                const dir = directories.find(d => d.id === selectedDirId);
+                if (dir && !isTrashView) {
+                    document.getElementById('editorContent').style.display = 'block';
+                    document.getElementById('noNoteSelected').style.display = 'none';
+                    document.getElementById('editorContent').innerHTML = notesCache[selectedDirId] || '';
+                    document.getElementById('noteTitleInput').value = dir.name;
+                    document.getElementById('noteTitleInput').disabled = false;
                 } else {
-                    editorContent.style.display = 'none';
-                    noNoteSelected.style.display = 'flex';
-                    noteTitleInput.value = '';
-                    noteTitleInput.disabled = true;
-                    document.getElementById('editorToolbar').style.opacity = '0.5';
-                    document.getElementById('editorToolbar').style.pointerEvents = 'none';
+                    document.getElementById('editorContent').style.display = 'none';
+                    document.getElementById('noNoteSelected').style.display = 'flex';
+                    document.getElementById('noteTitleInput').value = '';
+                    document.getElementById('noteTitleInput').disabled = true;
                 }
             }
 
             function saveCurrentNote() {
                 if (selectedDirId && !isTrashView) {
-                    const content = editorContent.innerHTML;
-                    const title = noteTitleInput.value.trim();
+                    const content = document.getElementById('editorContent').innerHTML;
+                    notesCache[selectedDirId] = content;
+                    const title = document.getElementById('noteTitleInput').value.trim();
                     if (title) {
                         const dir = directories.find(d => d.id === selectedDirId);
-                        if (dir && dir.name !== title) {
-                            dir.name = title;
-                            updateDirInDB(selectedDirId, { name: title });
-                        }
+                        if (dir && dir.name !== title) { dir.name = title; updateDirDB(selectedDirId, { name: title }); }
                     }
-                    if (notesCache[selectedDirId] !== content) {
-                        saveNoteToDB(selectedDirId, content);
-                    }
+                    saveNoteDB(selectedDirId, content);
                 }
             }
+            async function saveNoteDB(id, content) { await supabase.from('notes').upsert({ dir_id: id, content }); }
+            async function updateDirDB(id, updates) { await supabase.from('directories').update(updates).eq('id', id); }
 
-            // 自动保存防抖
-            let autoSaveTimer;
-            editorContent.addEventListener('input', () => {
-                clearTimeout(autoSaveTimer);
-                autoSaveTimer = setTimeout(saveCurrentNote, SYNC_DEBOUNCE);
+            async function toggleStar(dirId) {
+                const dir = directories.find(d => d.id === dirId);
+                if (!dir) return;
+                dir.isStarred = !dir.isStarred;
+                await updateDirDB(dirId, { is_starred: dir.isStarred });
+                renderTree();
+            }
+
+            // 新建目录
+            document.getElementById('btnNewDir').addEventListener('click', async () => {
+                const name = prompt('目录名称：', '新建目录');
+                if (!name) return;
+                const siblings = getChildren(null);
+                const newDir = { id: generateId(), name: name.trim(), parentId: null, isStarred: false, order: siblings.length };
+                directories.push(newDir);
+                await supabase.from('directories').insert({ id: newDir.id, user_id: currentUser.id, name: newDir.name, parent_id: null, is_starred: false, order_index: newDir.order });
+                await loadAllData();
+                selectDirectory(newDir.id);
             });
-            noteTitleInput.addEventListener('input', () => {
-                clearTimeout(autoSaveTimer);
-                autoSaveTimer = setTimeout(saveCurrentNote, SYNC_DEBOUNCE);
+
+            // 删除
+            document.getElementById('btnDelete').addEventListener('click', async () => {
+                if (!selectedDirId || isTrashView) return;
+                if (confirm('确定删除该目录？')) {
+                    const descendantIds = getDescendantIds(selectedDirId);
+                    const allIds = [selectedDirId, ...descendantIds];
+                    const dir = directories.find(d => d.id === selectedDirId);
+                    await supabase.from('trash').insert({ user_id: currentUser.id, dir_data: dir, sub_tree: directories.filter(d => allIds.includes(d.id) && d.id !== selectedDirId), notes_data: Object.fromEntries(allIds.map(id => [id, notesCache[id] || ''])) });
+                    await supabase.from('directories').delete().in('id', allIds);
+                    allIds.forEach(id => delete notesCache[id]);
+                    selectedDirId = null;
+                    await loadAllData();
+                }
             });
+
+            document.getElementById('btnBackFromTrash').addEventListener('click', () => {
+                isTrashView = false;
+                document.getElementById('trashView').style.display = 'none';
+                document.getElementById('treeView').style.display = 'block';
+                renderTree();
+                updateEditorState();
+            });
+            document.getElementById('btnTrash').addEventListener('click', async () => {
+                isTrashView = !isTrashView;
+                if (isTrashView) {
+                    document.getElementById('treeView').style.display = 'none';
+                    document.getElementById('trashView').style.display = 'block';
+                    const list = document.getElementById('trashList');
+                    list.innerHTML = trashList.map((item,i) => `<div>${item.dir_data?.name} <button onclick="window._restoreTrash(${i})">恢复</button></div>`).join('');
+                } else {
+                    document.getElementById('btnBackFromTrash').click();
+                }
+            });
+            window._restoreTrash = async function(i) {
+                const item = trashList[i];
+                if (!item) return;
+                const dir = item.dir_data;
+                directories.push(dir);
+                await supabase.from('directories').insert({ id: dir.id, user_id: currentUser.id, name: dir.name, parent_id: null, is_starred: dir.is_starred || false, order_index: 0 });
+                for (const [id, content] of Object.entries(item.notes_data || {})) { await supabase.from('notes').upsert({ dir_id: id, content }); }
+                await supabase.from('trash').delete().eq('id', item.id);
+                await loadAllData();
+                isTrashView = false;
+                document.getElementById('trashView').style.display = 'none';
+                document.getElementById('treeView').style.display = 'block';
+                renderTree();
+            };
 
             // 编辑器工具栏
-            function execCmd(cmd, val = null) {
-                editorContent.focus();
-                document.execCommand(cmd, false, val);
-                saveCurrentNote();
-            }
-            document.getElementById('btnBold').addEventListener('click', () => execCmd('bold'));
-            document.getElementById('btnItalic').addEventListener('click', () => execCmd('italic'));
-            document.getElementById('btnUnderline').addEventListener('click', () => execCmd('underline'));
-            document.getElementById('btnStrike').addEventListener('click', () => execCmd('strikeThrough'));
-            document.getElementById('btnAlignLeft').addEventListener('click', () => execCmd('justifyLeft'));
-            document.getElementById('btnAlignCenter').addEventListener('click', () => execCmd('justifyCenter'));
-            document.getElementById('btnAlignRight').addEventListener('click', () => execCmd('justifyRight'));
-            document.getElementById('btnUL').addEventListener('click', () => execCmd('insertUnorderedList'));
-            document.getElementById('btnOL').addEventListener('click', () => execCmd('insertOrderedList'));
-            document.getElementById('btnClearFormat').addEventListener('click', () => execCmd('removeFormat'));
-            document.getElementById('fontSizeSelect').addEventListener('change', function() {
-                execCmd('fontSize', this.value);
-            });
-            document.getElementById('fontColorInput').addEventListener('input', function() {
-                execCmd('foreColor', this.value);
-            });
+            function execCmd(cmd, val=null) { document.getElementById('editorContent').focus(); document.execCommand(cmd, false, val); saveCurrentNote(); }
+            document.getElementById('btnBold').addEventListener('click', ()=>execCmd('bold'));
+            document.getElementById('btnItalic').addEventListener('click', ()=>execCmd('italic'));
+            document.getElementById('btnUnderline').addEventListener('click', ()=>execCmd('underline'));
+            document.getElementById('fontSizeSelect').addEventListener('change', function(){ execCmd('fontSize', this.value); });
+            document.getElementById('fontColorInput').addEventListener('input', function(){ execCmd('foreColor', this.value); });
+            document.getElementById('btnUL').addEventListener('click', ()=>execCmd('insertUnorderedList'));
+            document.getElementById('btnOL').addEventListener('click', ()=>execCmd('insertOrderedList'));
 
-            // 搜索
-            document.getElementById('searchInput').addEventListener('input', function() {
-                searchQuery = this.value.trim();
-                document.getElementById('searchClear').style.display = searchQuery ? 'block' : 'none';
-                renderTree();
-            });
-            document.getElementById('searchClear').addEventListener('click', function() {
-                document.getElementById('searchInput').value = '';
-                searchQuery = '';
-                this.style.display = 'none';
-                renderTree();
-            });
+            document.getElementById('editorContent').addEventListener('input', () => clearTimeout(window._saveTimer) && (window._saveTimer = setTimeout(saveCurrentNote, 800)));
+            document.getElementById('noteTitleInput').addEventListener('input', () => clearTimeout(window._saveTimer) && (window._saveTimer = setTimeout(saveCurrentNote, 800)));
 
-            // 其他按钮
-            document.getElementById('btnNewDir').addEventListener('click', () => createNewDirectory(null));
-            document.getElementById('btnDelete').addEventListener('click', () => { if (selectedDirId) confirmDelete(
-                    selectedDirId); });
-            document.getElementById('btnTrash').addEventListener('click', () => isTrashView ? hideTrashView() :
-                showTrashView());
-            document.getElementById('btnBackFromTrash').addEventListener('click', hideTrashView);
-            document.getElementById('btnLogout').addEventListener('click', signOut);
-
-            // 分隔条拖拽
+            // 分隔条
             const divider = document.getElementById('divider');
-            const leftPanel = document.getElementById('leftPanel');
-            let isDragging = false,
-                startX, startWidth;
-            divider.addEventListener('mousedown', e => {
-                isDragging = true;
-                startX = e.clientX;
-                startWidth = leftPanel.offsetWidth;
-                document.body.style.cursor = 'col-resize';
-                e.preventDefault();
-            });
-            document.addEventListener('mousemove', e => {
-                if (!isDragging) return;
-                let w = startWidth + e.clientX - startX;
-                w = Math.max(200, Math.min(w, window.innerWidth * 0.55));
-                leftPanel.style.width = w + 'px';
-            });
-            document.addEventListener('mouseup', () => { isDragging = false;
-                document.body.style.cursor = ''; });
+            const leftPanel = document.querySelector('.left-panel');
+            let dragging = false;
+            divider.addEventListener('mousedown', e => { dragging = true; document.body.style.cursor = 'col-resize'; e.preventDefault(); });
+            document.addEventListener('mousemove', e => { if (dragging) leftPanel.style.width = Math.max(200, Math.min(e.clientX, window.innerWidth*0.55)) + 'px'; });
+            document.addEventListener('mouseup', () => { dragging = false; document.body.style.cursor = ''; });
 
-            // 窗口聚焦时刷新数据（跨设备同步简捷方案）
-            window.addEventListener('focus', async () => {
-                if (currentUser) {
-                    await loadAllData();
-                    renderTree();
-                    updateEditorState();
-                    updateTrashBadge();
-                }
-            });
-
-            // 认证界面事件
-            document.getElementById('btnLogin').addEventListener('click', async () => {
-                const email = document.getElementById('authEmail').value.trim();
-                const pwd = document.getElementById('authPassword').value;
-                document.getElementById('authError').textContent = '';
-                try {
-                    await signIn(email, pwd);
-                } catch (e) {
-                    document.getElementById('authError').textContent = '登录失败: ' + e.message;
-                }
-            });
-            document.getElementById('btnRegister').addEventListener('click', async () => {
-                const email = document.getElementById('authEmail').value.trim();
-                const pwd = document.getElementById('authPassword').value;
-                if (pwd.length < 6) return document.getElementById('authError').textContent = '密码至少6位';
-                document.getElementById('authError').textContent = '';
-                try {
-                    await signUp(email, pwd);
-                } catch (e) {
-                    document.getElementById('authError').textContent = '注册失败: ' + e.message;
-                }
-            });
-
-            // 工具函数
-            function showToast(msg) {
-                const t = document.createElement('div');
-                t.className = 'toast';
-                t.textContent = msg;
-                document.getElementById('toastContainer').appendChild(t);
-                setTimeout(() => t.remove(), 2000);
-            }
-
-            function showModal(title, msg, onConfirm) {
-                const container = document.getElementById('modalContainer');
-                const overlay = document.createElement('div');
-                overlay.className = 'modal-overlay';
-                overlay.innerHTML = `
-              <div class="modal-dialog">
-                <h3>${escapeHtml(title)}</h3>
-                <p>${escapeHtml(msg)}</p>
-                <div style="display:flex;gap:8px;justify-content:center;">
-                  <button class="btn-cancel">取消</button>
-                  <button class="btn-confirm" style="background:var(--danger);color:#fff;border:none;">确认</button>
-                </div>
-              </div>`;
-                container.appendChild(overlay);
-                const close = () => overlay.remove();
-                overlay.querySelector('.btn-cancel').addEventListener('click', close);
-                overlay.querySelector('.btn-confirm').addEventListener('click', () => { close();
-                    onConfirm(); });
-                overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-            }
-
-            function escapeHtml(s) { const d = document.createElement('div');
-                d.textContent = s; return d.innerHTML; }
-
-            // 初始化
+            // 启动
             checkSession();
-            // 监听认证状态变化
-            supabase.auth.onAuthStateChange((event, session) => {
-                if (event === 'SIGNED_OUT') {
-                    currentUser = null;
-                    authOverlay.style.display = 'flex';
-                    appContainer.style.display = 'none';
-                } else if (session?.user && !currentUser) {
-                    checkSession();
-                }
-            });
-
-            console.log('🔄 云同步记事本已启动 - 请先登录');
+            supabase.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_OUT') location.reload(); });
+            window.addEventListener('focus', () => { if (currentUser) loadAllData(); });
         })();
     </script>
 </body>
