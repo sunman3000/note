@@ -154,7 +154,9 @@
 
             // 帮助函数
             function getChildren(parentId) {
-                return directories.filter(d => d.parentId === parentId).sort((a,b) => (b.isStarred - a.isStarred) || (a.order - b.order));
+                 return directories
+                    .filter(d => d.parent_id === parentId)
+                    .sort((a, b) => (b.is_starred - a.is_starred) || (a.order_index - b.order_index));
             }
             function getDescendantIds(dirId) {
                 const result = [];
@@ -184,36 +186,45 @@
             }
 
             function createDirNodeElement(dir, depth) {
-                const node = document.createElement('div');
-                node.className = 'dir-node expanded';
-                node.dataset.dirId = dir.id;
-                node.style.setProperty('--depth', depth);
-                const row = document.createElement('div');
-                row.className = 'dir-row';
-                if (dir.id === selectedDirId) row.classList.add('selected');
-                const expandBtn = document.createElement('button');
-                expandBtn.className = 'expand-btn' + (getChildren(dir.id).length ? '' : ' empty');
-                expandBtn.innerHTML = '▶';
-                expandBtn.addEventListener('click', e => { e.stopPropagation(); node.classList.toggle('expanded'); });
-                row.appendChild(expandBtn);
-                const icon = document.createElement('span');
-                icon.textContent = '📄';
-                row.appendChild(icon);
-                const name = document.createElement('span');
-                name.textContent = dir.name;
-                row.appendChild(name);
-                const starBtn = document.createElement('button');
-                starBtn.className = 'star-btn' + (dir.isStarred ? ' starred' : '');
-                starBtn.textContent = dir.isStarred ? '⭐' : '☆';
-                starBtn.addEventListener('click', e => { e.stopPropagation(); toggleStar(dir.id); });
-                row.appendChild(starBtn);
-                row.addEventListener('click', () => selectDirectory(dir.id));
-                node.appendChild(row);
-                const childrenContainer = document.createElement('div');
-                childrenContainer.className = 'children';
-                getChildren(dir.id).forEach(c => childrenContainer.appendChild(createDirNodeElement(c, depth+1)));
-                node.appendChild(childrenContainer);
-                return node;
+                    const node = document.createElement('div');
+                    node.className = 'dir-node expanded';
+                    node.dataset.dirId = dir.id;
+                    node.style.setProperty('--depth', depth);
+                    const hasChildren = getChildren(dir.id).length > 0;
+
+                    const row = document.createElement('div');
+                    row.className = 'dir-row';
+                    if (dir.id === selectedDirId) row.classList.add('selected');
+
+                    const expandBtn = document.createElement('button');
+                    expandBtn.className = 'expand-btn' + (hasChildren ? '' : ' empty');
+                    expandBtn.innerHTML = '▶';
+                    expandBtn.addEventListener('click', e => { e.stopPropagation(); node.classList.toggle('expanded'); });
+                    row.appendChild(expandBtn);
+
+                    const icon = document.createElement('span');
+                    icon.textContent = hasChildren ? '📁' : '📄';
+                    row.appendChild(icon);
+
+                    const name = document.createElement('span');
+                    name.textContent = dir.name;
+                    row.appendChild(name);
+
+                    const starBtn = document.createElement('button');
+                    starBtn.className = 'star-btn' + (dir.is_starred ? ' starred' : '');
+                    starBtn.textContent = dir.is_starred ? '⭐' : '☆';
+                    starBtn.addEventListener('click', e => { e.stopPropagation(); toggleStar(dir.id); });
+                    row.appendChild(starBtn);
+
+                    row.addEventListener('click', () => selectDirectory(dir.id));
+                    node.appendChild(row);
+
+                    const childrenContainer = document.createElement('div');
+                    childrenContainer.className = 'children';
+                    getChildren(dir.id).forEach(c => childrenContainer.appendChild(createDirNodeElement(c, depth + 1)));
+                    node.appendChild(childrenContainer);
+
+                    return node;
             }
 
             function selectDirectory(dirId) {
@@ -255,11 +266,11 @@
             async function updateDirDB(id, updates) { await supabase.from('directories').update(updates).eq('id', id); }
 
             async function toggleStar(dirId) {
-                const dir = directories.find(d => d.id === dirId);
-                if (!dir) return;
-                dir.isStarred = !dir.isStarred;
-                await updateDirDB(dirId, { is_starred: dir.isStarred });
-                renderTree();
+                 const dir = directories.find(d => d.id === dirId);
+                 if (!dir) return;
+                 dir.is_starred = !dir.is_starred;
+                 await supabase.from('directories').update({ is_starred: dir.is_starred }).eq('id', dirId);
+                 renderTree();
             }
 
             // 新建目录
